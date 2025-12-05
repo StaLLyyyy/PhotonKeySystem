@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Photon Key System</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+        body { font-family: 'JetBrains Mono', monospace; background-color: #0f0f13; color: #e0e0e0; }
+        .neon-border { box-shadow: 0 0 10px rgba(99, 102, 241, 0.5); }
+        .btn-glitch:hover { text-shadow: 2px 0 #ff00c1, -2px 0 #00fff9; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // --- HASHING ALGORITHM (MUST MATCH LUA) ---
+        // Simple DJB2 variant for string hashing
+        function generateKey() {
+            const secret = "PhotonSecretSalt_2025"; // MUST MATCH LUA
+            const currentHour = Math.floor(Date.now() / 1000 / 3600);
+            const raw = secret + currentHour;
+            
+            let hash = 5381;
+            for (let i = 0; i < raw.length; i++) {
+                hash = ((hash << 5) + hash) + raw.charCodeAt(i);
+                hash = hash & 0xFFFFFFFF; // Convert to 32bit integer
+            }
+            
+            // Convert to Hex and make it look cool
+            let hex = (hash >>> 0).toString(16).toUpperCase();
+            while (hex.length < 8) hex = "0" + hex;
+            
+            return `KEY-${hex}`;
+        }
+
+        function App() {
+            const [step, setStep] = useState(0); // 0: Start, 1: Ad/Wait, 2: Key
+            const [timer, setTimer] = useState(10);
+            const [key, setKey] = useState("");
+
+            useEffect(() => {
+                let interval;
+                if (step === 1 && timer > 0) {
+                    interval = setInterval(() => setTimer(t => t - 1), 1000);
+                } else if (step === 1 && timer === 0) {
+                    setKey(generateKey());
+                    setStep(2);
+                }
+                return () => clearInterval(interval);
+            }, [step, timer]);
+
+            const startProcess = () => {
+                setStep(1);
+            };
+
+            const copyKey = () => {
+                // Fix for Clipboard API errors: use fallback mechanism
+                const textArea = document.createElement("textarea");
+                textArea.value = key;
+                
+                // Ensure textArea is not visible but part of DOM
+                textArea.style.position = "fixed";
+                textArea.style.left = "-9999px";
+                textArea.style.top = "0";
+                document.body.appendChild(textArea);
+                
+                textArea.focus();
+                textArea.select();
+
+                try {
+                    const successful = document.execCommand('copy');
+                    if(successful) {
+                        alert("Key copied to clipboard!");
+                    } else {
+                         alert("Please copy the key manually.");
+                    }
+                } catch (err) {
+                    console.error('Fallback: Oops, unable to copy', err);
+                     alert("Please copy the key manually.");
+                }
+
+                document.body.removeChild(textArea);
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col items-center justify-center p-4">
+                    <div className="max-w-md w-full bg-slate-900 border border-indigo-500/30 p-8 rounded-xl shadow-2xl neon-border relative overflow-hidden">
+                        
+                        {/* Header */}
+                        <div className="text-center mb-8">
+                            <h1 className="text-3xl font-bold text-indigo-400 tracking-tighter">PHOTON<span className="text-white">_ACCESS</span></h1>
+                            <div className="text-xs text-slate-500 mt-2">SECURE GATEWAY v2.0</div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="space-y-6">
+                            {step === 0 && (
+                                <div className="text-center animate-fade-in">
+                                    <p className="text-sm text-slate-400 mb-6">
+                                        To access the script, you must complete the verification process.
+                                        This key is valid for <span className="text-white font-bold">1 hour</span>.
+                                    </p>
+                                    <button 
+                                        onClick={startProcess}
+                                        className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded transition-all btn-glitch"
+                                    >
+                                        GET KEY
+                                    </button>
+                                </div>
+                            )}
+
+                            {step === 1 && (
+                                <div className="text-center">
+                                    <div className="mb-4 text-slate-300">Checking credentials...</div>
+                                    <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden mb-2">
+                                        <div 
+                                            className="bg-indigo-500 h-full transition-all duration-1000 ease-linear"
+                                            style={{ width: `${((10 - timer) / 10) * 100}%` }}
+                                        ></div>
+                                    </div>
+                                    <p className="text-xs text-slate-500">Watching Sponsor Ad ({timer}s)...</p>
+                                </div>
+                            )}
+
+                            {step === 2 && (
+                                <div className="text-center">
+                                    <div className="text-green-400 text-sm mb-2">ACCESS GRANTED</div>
+                                    <div className="bg-black/50 p-4 rounded border border-indigo-500/50 font-mono text-xl tracking-widest text-white mb-4 select-all">
+                                        {key}
+                                    </div>
+                                    <button 
+                                        onClick={copyKey}
+                                        className="w-full py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded transition-colors"
+                                    >
+                                        COPY KEY
+                                    </button>
+                                    <p className="text-[10px] text-slate-600 mt-4">
+                                        Paste this key into the Photon Menu.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer Deco */}
+                        <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-indigo-500 to-transparent opacity-50"></div>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
